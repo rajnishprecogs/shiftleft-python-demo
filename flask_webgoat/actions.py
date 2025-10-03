@@ -38,19 +38,35 @@ def log_entry():
 
 
 @bp.route("/grep_processes")
+from flask import request, jsonify
+import subprocess
+import shlex
+
 def grep_processes():
     name = request.args.get("name")
-    # vulnerability: Remote Code Execution
-    res = subprocess.run(
-        ["ps aux | grep " + name + " | awk '{print $11}'"],
-        shell=True,
-        capture_output=True,
-    )
-    if res.stdout is None:
-        return jsonify({"error": "no stdout returned"})
-    out = res.stdout.decode("utf-8")
-    names = out.split("\n")
-    return jsonify({"success": True, "names": names})
+    if not name or not isinstance(name, str):
+        return jsonify({"error": "Invalid process name"}), 400
+    # FIX: Use subprocess without shell=True and pass arguments as a list to avoid shell injection
+    try:
+        # Use 'ps aux' and filter in Python instead of using shell pipelines
+        res = subprocess.run(["ps", "aux"], capture_output=True, check=True)
+        output = res.stdout.decode("utf-8")
+        lines = output.splitlines()
+        names = []
+        for line in lines[1:]:  # skip header
+            if name in line:
+                parts = line.split()
+                if len(parts) > 10:
+                    names.append(parts[10])  # $11 in awk is index 10 in Python (0-based)
+        return jsonify({"success": True, "names": names})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# This fix is secure because it:
+# - Avoids shell=True and does not concatenate user input into a shell command.
+# - Uses subprocess with a list of arguments, preventing shell interpretation.
+# - Filters process names in Python, eliminating the risk of command injection.
+# - Handles errors gracefully and validates input.
 
 
 @bp.route("/deserialized_descr", methods=["POST"])
