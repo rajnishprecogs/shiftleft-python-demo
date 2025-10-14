@@ -34,14 +34,12 @@ def create_user():
             402,
         )
 
-    # vulnerability: SQL Injection
-    query = (
-        "INSERT INTO user (username, password, access_level) VALUES ('%s', '%s', %d)"
-        % (username, password, int(access_level))
-    )
+    # FIX: Use parameterized queries to prevent SQL injection
+    query = "INSERT INTO user (username, password, access_level) VALUES (?, ?, ?)"
+    parameters = (username, password, int(access_level))
 
     try:
-        query_db(query, [], False, True)
+        query_db(query, parameters, False, True)
         return jsonify({"success": True})
     except sqlite3.Error as err:
-        return jsonify({"error": "could not create user:" + err})
+        return jsonify({"error": "could not create user:" + str(err)})
