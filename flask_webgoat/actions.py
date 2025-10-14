@@ -38,19 +38,34 @@ def log_entry():
 
 
 @bp.route("/grep_processes")
+from flask import request, jsonify
+import subprocess
+import shlex
+
 def grep_processes():
     name = request.args.get("name")
-    # vulnerability: Remote Code Execution
-    res = subprocess.run(
-        ["ps aux | grep " + name + " | awk '{print $11}'"],
-        shell=True,
-        capture_output=True,
-    )
-    if res.stdout is None:
-        return jsonify({"error": "no stdout returned"})
-    out = res.stdout.decode("utf-8")
-    names = out.split("\n")
-    return jsonify({"success": True, "names": names})
+    if not name:
+        return jsonify({"error": "name parameter is required"})
+
+    # Sanitize the input to prevent command injection
+    sanitized_name = shlex.quote(name)
+
+    try:
+        # Use a safer approach to execute the command
+        res = subprocess.run(
+            ["ps", "aux"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+
+        # Filter the output in Python instead of using shell commands
+        output_lines = res.stdout.splitlines()
+        filtered_lines = [line.split()[10] for line in output_lines if sanitized_name in line]
+
+        return jsonify({"success": True, "names": filtered_lines})
+    except subprocess.CalledProcessError as e:
+        return jsonify({"error": "Failed to execute command", "details": str(e)})
 
 
 @bp.route("/deserialized_descr", methods=["POST"])
